@@ -8,24 +8,42 @@ import shutil
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate
+import configparser
+from pathlib import Path
+
+
+# Конфиг
+cfgFile=os.path.join(Path(sys.argv[0]).parent,'t-send.cfg')
+
+if not os.path.exists(cfgFile):
+    print("Can not read config file: "+cfgFile)
+    quit(1)
+
+config = configparser.ConfigParser()
+config.read(cfgFile)
 
 # Лог
-from email.utils import formatdate
-
-logf = '/home/mt/log.txt'
+logf = config['default']['log']
 # каталог, куда transmission складыает слитые файлы
-down_dir = '/home/mt'
+down_dir = config['default']['down_dir']
 # каталог, куда копировать файлы
-copy_dir = '/home/mt/1'
+copy_dir = config['default']['copy_dir']
 # База данных
-db = '/home/mt/queue.db'
+db = config['default']['db']
 
 # EMail
-HOST = '10.10.0.10'
-TO = 'mt@vbbs.tech'
-FROM = 't-send@vbbs.tech'
-LOGIN = 't-send'
-PASS = '!!'
+HOST = config['email']['HOST']
+TO = config['email']['TO']
+FROM = config['email']['FROM']
+LOGIN = config['email']['LOGIN']
+PASS = config['email']['PASS']
+
+def copy_function(src,dst):
+    try:
+        shutil.copy(src,dst)
+    except:
+        pass
 
 hash = sys.argv[1]
 id = sys.argv[2]
@@ -96,9 +114,15 @@ print("Copy : [" + filename + '] --> [' + dst + ']')
 logger.info("Copy file: [" + filename + '] --> [' + dst + ']')
 
 if fileIsDir:
-    shutil.copytree(fn, dst, dirs_exist_ok=True)
+    try:
+        shutil.copytree(fn, dst, dirs_exist_ok=True,copy_function=copy_function)
+    except:
+        pass
 else:
-    shutil.copy2(fn, dst)
+    try:
+        shutil.copy2(fn, dst)
+    except:
+        pass
 
 logger.debug('Connect to database second time: [' + db + ']')
 conn = sqlite3.connect(db)
