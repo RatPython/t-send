@@ -6,8 +6,12 @@ import os
 import logging
 import shutil
 import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 # Лог
+from email.utils import formatdate
+
 logf = '/home/mt/log.txt'
 # каталог, куда transmission складыает слитые файлы
 down_dir = '/home/mt'
@@ -21,7 +25,7 @@ HOST = '10.10.0.10'
 TO = 'mt@vbbs.tech'
 FROM = 't-send@vbbs.tech'
 LOGIN = 't-send'
-PASS = 'megaPass'
+PASS = '!!'
 
 hash = sys.argv[1]
 id = sys.argv[2]
@@ -102,7 +106,7 @@ cursor = conn.cursor()
 
 qu = "update queue set copied=1 where id=?"
 logger.debug(qu + '  :  ', num)
-cursor.execute(qu, (num))
+cursor.execute(qu, num)
 conn.commit()
 logger.debug('Disconnect to database: [' + db + ']')
 conn.close()
@@ -113,17 +117,18 @@ subj = 'Torrent [' + filename + '] downloaded'
 
 text = "\r\n\r\n" + subj + "\r\n\r\nID  : " + id + "\r\nHASH: " + hash + "\r\nNUM : " + num
 
-BODY = "\r\n".join((
-    "From: %s" % FROM,
-    "To: %s" % TO,
-    "Subject: %s" % subj,
-    "",
-    text
-))
+msg = MIMEMultipart()
+msg["From"] = FROM
+msg["Subject"] = subj
+msg["Date"] = formatdate(localtime=True)
+
+msg.attach( MIMEText(text))
+
+#msg = MIMEText(msg.encode('utf-8'), _charset='utf-8')
 
 server = smtplib.SMTP(HOST)
 server.login(LOGIN, PASS)
-server.sendmail(FROM, [TO], BODY)
+server.sendmail(FROM, [TO], msg.as_string())
 server.quit()
 
 logger.info('+ END.')
