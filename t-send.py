@@ -49,11 +49,11 @@ hash = sys.argv[1]
 id = sys.argv[2]
 filename = sys.argv[3]
 
-pid = os.getpid()
+pid = str(os.getpid())
 
 # логгер
-logger = logging.getLogger("Torrent-Copy")
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("Torrent-Copy["+pid+']')
+logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler(logf)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
@@ -98,12 +98,12 @@ cursor.execute(qu, (id, hash, filename))
 conn.commit()
 
 qu = "select max(id) from queue"
+logger.debug(qu)
 cursor.execute(qu)
 num = str(cursor.fetchone()[0])
+logger.debug(" Result: "+num)
 logger.debug('Disconnect to database: [' + db + ']')
 conn.close()
-
-logger.debug("Directory num:[" + num + ']')
 
 dstDir = os.path.join(copy_dir, num)
 logger.debug("Creating dir: [" + dstDir + ']')
@@ -115,13 +115,17 @@ logger.info("Copy file: [" + filename + '] --> [' + dst + ']')
 
 if fileIsDir:
     try:
+        logger.debug("shutil.copytree(%s,%s, dirs_exist_ok=True,copy_function=copy_function)" % (fn,dst))
         shutil.copytree(fn, dst, dirs_exist_ok=True,copy_function=copy_function)
-    except:
+    except Exception as E:
+        logger.debug(" * Exception: ",str(E))
         pass
 else:
     try:
+        logger.debug("shutil.copy2(%s, %s)" % (fn, dst))
         shutil.copy2(fn, dst)
-    except:
+    except Exception as E:
+        logger.debug(" * Exception: ", str(E))
         pass
 
 logger.debug('Connect to database second time: [' + db + ']')
@@ -129,10 +133,10 @@ conn = sqlite3.connect(db)
 cursor = conn.cursor()
 
 qu = "update queue set copied=1 where id=?"
-logger.debug(qu + '  :  ', num)
-cursor.execute(qu, num)
+logger.debug(qu + '  :  '+ num)
+cursor.execute(qu, [num])
 conn.commit()
-logger.debug('Disconnect to database: [' + db + ']')
+logger.debug('Disconnect from database second time: [' + db + ']')
 conn.close()
 
 logger.debug("Send Mail")
@@ -146,13 +150,18 @@ msg["From"] = FROM
 msg["Subject"] = subj
 msg["Date"] = formatdate(localtime=True)
 
-msg.attach( MIMEText(text))
+msg.attach(MIMEText(text))
 
 #msg = MIMEText(msg.encode('utf-8'), _charset='utf-8')
 
-server = smtplib.SMTP(HOST)
-server.login(LOGIN, PASS)
-server.sendmail(FROM, [TO], msg.as_string())
-server.quit()
+try:
+    server = smtplib.SMTP(HOST)
+    server.login(LOGIN, PASS)
+    server.sendmail(FROM, [TO], msg.as_string())
+    server.quit()
+except Exception as E:
+    print("Error sending mail: ",str(E))
+    logger.debug("Error sending mail: ",str(E))
+
 
 logger.info('+ END.')
