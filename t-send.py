@@ -178,7 +178,17 @@ logger.info('Number of files to process: '+str(len(filenames)))
 
 for file in filenames:
     queueFile = os.path.join(queue_dir, file)
+    lockFile=queueFile+'.lock'
     logger.debug('Queue file: '+queueFile)
+
+    if os.path.exists(lockFile):
+        logger.info("Lock file exists. Skipping.. "+ lockFile)
+        continue
+
+    with open(lockFile,'w') as lf:
+        lf.write('locked!')
+        lf.close()
+
     with open(queueFile,'r') as f:
         num = f.readline().strip("\n")
         hash=f.readline().strip("\n")
@@ -194,6 +204,8 @@ for file in filenames:
 
     if not os.path.exists(fn):
         print("No such file: [" + fn + ']')
+        if os.path.exists(lockFile):
+            os.remove(lockFile)
         logger.error("!! No such file: [" + fn + ']')
         continue
 
@@ -212,6 +224,8 @@ for file in filenames:
     except Exception as E:
         logger.error('Unable to create dir: '+dstDir)
         logger.error(str(E))
+        if os.path.exists(lockFile):
+            os.remove(lockFile)
         continue
 
     dst = os.path.join(dstDir, filename)
@@ -268,6 +282,7 @@ for file in filenames:
         print("Error sending mail: ",str(E))
         logger.debug("Error sending mail: ",str(E))
 
+    os.remove(lockFile)
     os.remove(queueFile)
 
 
